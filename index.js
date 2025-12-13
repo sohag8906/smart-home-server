@@ -3,46 +3,45 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
-const app = express();
-const port = process.env.PORT || 3000;
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
 const serviceAccount = require("./smart-home-37fee-firebase-adminsdk-fb.json");
+const { abort } = require('process');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
+const app = express();
+const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-const verifyFBToken = async(req, res, next) =>{
+// Firebase token verification middleware
+const verifyFBToken = async (req, res, next) => {
   const token = req.headers.authorization;
 
-  if(!token){
-    return res.status(401).send({message: 'unauthorized access'});
+  if (!token) {
+    return res.status(401).send({ message: 'Unauthorized access' });
   }
 
-  try{
-    const idToken = token.split(' ')[1];  // <-- FIXED
+  try {
+    const idToken = token.split(' ')[1]; // token format: "Bearer <idToken>"
     const decoded = await admin.auth().verifyIdToken(idToken);
     req.decoded_email = decoded.email;
     next();
+  } catch (err) {
+    return res.status(401).send({ message: 'Unauthorized access' });
   }
-  catch(err){
-    return res.status(401).send({message: 'unauthorized access'});
-  }
-}
-
-
-
+};
 
 // MongoDB URI
-const uri = "mongodb+srv://smart_home_user:lu36KAH6Olqdbd0j@cluster0.qoielcp.mongodb.net/?appName=Cluster0";
+const uri = process.env.MONGO_URI || "mongodb+srv://smart_home_user:lu36KAH6Olqdbd0j@cluster0.qoielcp.mongodb.net/?appName=Cluster0";
 
 // MongoClient
 const client = new MongoClient(uri, {
@@ -166,6 +165,7 @@ async function run() {
           userEmail,
           bookingDate,
         });
+
         if (existingBooking) {
           return res.status(400).send({ message: "Already booked this service on this date" });
         }
@@ -192,18 +192,37 @@ async function run() {
       }
     });
 
-    // Get bookings by email (frontend MyBookings)
- app.get("/bookings/:email", verifyFBToken, async (req, res) => {
+    // Get bookings by email (requires Firebase token)
+    app.get("/bookings/:email", verifyFBToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        // Optional: check if decoded email matches requested email
+        if (req.decoded_email !== email) {
+          return res.status(403).send({ message: "Forbidden access" });
+        }
+        const bookings = await bookingsCollection.find({ userEmail: email }).toArray();
+        res.send(bookings);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Error fetching bookings", error: err });
+      }
+    });
+
+    app.get("/booking/:id", async (req, res) => {
   try {
-    const email = req.params.email; // এখন ঠিক আছে
-    const bookings = await bookingsCollection.find({ userEmail: email }).toArray();
-    res.send(bookings);
-    
+    const id = req.params.id;
+    const booking = await bookingsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!booking) {
+      return res.status(404).send({ message: "Booking not found" });
+    }
+    res.send(booking);
   } catch (err) {
     console.error(err);
-    res.status(500).send({ message: "Error fetching bookings", error: err });
+    res.status(500).send({ message: "Error fetching booking", error: err });
   }
 });
+
 
     // Delete booking
     app.delete("/bookings/:id", async (req, res) => {
@@ -235,6 +254,69 @@ async function run() {
       }
     });
 
+    // payment related apis
+    app.post('/create-checkout-session', async (req,res) =>{
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo.cost)*100;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              unit_data: amount,
+              product_data: {
+                name: `please pay for: ${paymentInfo.serviceName}`
+              }
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        metadata: {
+          serviceId: paymentInfo.
+      serviceId
+        },
+        customer_email:paymentInfo.createdByEmail,
+        success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+      })
+      res.send({ url: session.url })
+    })
+    // old 
+    app.post('/create-checkout-session', async (req, res) =>{
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo.cost) *100;
+
+       const session = await stripe.checkout.sessions.create({
+    line_items: [
+      {
+        price_data: {
+          currency: 'USD',
+          unit_amount: amount,
+          product_data: {
+            name: paymentInfo.serviceName
+          }
+        },
+        quantity: 1,
+      },
+    ],
+    customer_email:paymentInfo.createdByEmail,
+    mode: 'payment',
+    metadata: {
+      
+        serviceId: paymentInfo.
+      serviceId
+    },
+    success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+    cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+  });
+
+  console.log(session)
+  res.send({ url: session.url })
+});
+  
+
+    // send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("MongoDB connection successful!");
   } finally {
