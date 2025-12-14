@@ -76,39 +76,109 @@ async function run() {
 
     console.log("MongoDB collections ready.");
 
-    // ==========================
-    // USERS ROUTES
-    // ==========================
-    app.get("/users", async (req, res) => {
-      const result = await usersCollection.find().toArray();
-      res.send(result);
-    });
+    // must be used after verifyFBToken middleware
+    const verifyAdmin = async(req, res, next) =>{
+  const email = req.decoded_email;
+  const query = {email};
+  const user = await  usersCollection.findOne(query);
 
-    app.get("/users/:email", async (req, res) => {
-      const email = req.params.email;
-      const user = await usersCollection.findOne({ email });
-      if (!user) return res.status(404).send({ message: "User not found" });
-      res.send(user);
-    });
+   if(!user || user.role !== 'admin'){
+     return res.status(403).send({message: 'forbidden access'});
+   }
 
-    app.post("/users", async (req, res) => {
+      next();
+    }
+
+   
+   
+    // user related pis
+  
+  app.get('/users', verifyFBToken, verifyFBToken, async (req, res) => {
+  try {
+    const searchText = req.query.searchText;
+    const query = {};
+
+    if (searchText) {
+     // query.displayName = { $regex: searchText, $options: 'i' };
+     query.$or = [
+      { displayName: { $regex: searchText, $options: 'i' } },
+        { email: { $regex: searchText, $options: 'i' } }
+     ]
+    }
+
+    // query 
+    const cursor =  usersCollection.find(query).sort({ createAt: -1 }).limit(5);
+    const result = await cursor.toArray();
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Server Error' });
+  }
+});
+
+
+
+  app.get('/users/:id', async(req, res) =>{
+
+  })
+
+  app.get('/users/:email/role', async(req, res) =>{
+   const email = req.params.email;
+   const query = {email}
+   const user = await usersCollection.findOne(query);
+   res.send({role: user?.role || 'user'})
+  })
+
+    app.post('/users', async(req, res) =>{
       const user = req.body;
-      const existingUser = await usersCollection.findOne({ email: user.email });
-      if (existingUser) return res.send({ message: "User already exists", insertedId: null });
+      user.role = 'user';
+      user.createAt = new Date();
+      const email = user.email;
+      const userExists = await usersCollection.findOne({email})
+
+      if(userExists){
+        return res.send({message: 'user exist'})
+      }
+
+
+
       const result = await usersCollection.insertOne(user);
       res.send(result);
-    });
 
-    app.patch("/users/role/:email", async (req, res) => {
-      const email = req.params.email;
-      const role = req.body.role;
-      const result = await usersCollection.updateOne({ email }, { $set: { role } });
+    })
+
+    app.patch('/users/:id/role', verifyFBToken, verifyAdmin, async(req, res) =>{
+      const id = req.params.id;
+      const roleInfo = req.body;
+      const query = {_id: new ObjectId(id)}
+      const updatedDoc = {
+        $set: {
+          role: roleInfo.role
+        }
+      }
+      const result = await usersCollection.updateOne(query, updatedDoc) 
       res.send(result);
-    });
+    })
 
-    // ==========================
+
+app.post("/payment", async (req, res) => {
+  try {
+    const result = await paymentCollection.insertOne(req.body);
+    
+    // একবার response পাঠানো
+    return res.send(result); // return দিলে function শেষ হয়ে যাবে
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: "Payment failed" });
+  }
+});
+
+
+
+    
+   
     // SERVICES ROUTES
-    // ==========================
+
     app.get('/services', async (req, res) => {
       try {
         const services = await servicesCollection.find().toArray();
@@ -159,9 +229,9 @@ async function run() {
       }
     });
 
-    // ==========================
+   
     // BOOKINGS ROUTES
-    // ==========================
+    
     app.post("/bookings", async (req, res) => {
       try {
         const { serviceId, userEmail, userName, bookingDate, location } = req.body;
