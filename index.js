@@ -93,21 +93,19 @@ async function run() {
    
     // user related pis
   
-  app.get('/users', verifyFBToken, verifyFBToken, async (req, res) => {
+  app.get('/users', verifyFBToken, async (req, res) => {
   try {
     const searchText = req.query.searchText;
     const query = {};
 
     if (searchText) {
-     // query.displayName = { $regex: searchText, $options: 'i' };
-     query.$or = [
-      { displayName: { $regex: searchText, $options: 'i' } },
+      query.$or = [
+        { displayName: { $regex: searchText, $options: 'i' } },
         { email: { $regex: searchText, $options: 'i' } }
-     ]
+      ];
     }
 
-    // query 
-    const cursor =  usersCollection.find(query).sort({ createAt: -1 }).limit(5);
+    const cursor = usersCollection.find(query).sort({ createAt: -1 }).limit(5);
     const result = await cursor.toArray();
     res.send(result);
   } catch (error) {
@@ -274,6 +272,16 @@ app.post("/payment", async (req, res) => {
         res.status(500).send({ message: "Server error", error: err });
       }
     });
+
+    app.get("/bookings", verifyFBToken, verifyAdmin, async (req, res) => {
+  try {
+    const bookings = await bookingsCollection.find().toArray();
+    res.send(bookings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Error fetching bookings", error: err });
+  }
+});
 
     // Get bookings by email (requires Firebase token)
     app.get("/bookings/:email", verifyFBToken, async (req, res) => {
