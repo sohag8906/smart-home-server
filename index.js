@@ -77,17 +77,16 @@ async function run() {
     console.log("MongoDB collections ready.");
 
     // must be used after verifyFBToken middleware
-    const verifyAdmin = async(req, res, next) =>{
+   const verifyAdmin = async(req, res, next) => {
   const email = req.decoded_email;
-  const query = {email};
-  const user = await  usersCollection.findOne(query);
+  const user = await usersCollection.findOne({ email });
 
-   if(!user || user.role !== 'admin'){
-     return res.status(403).send({message: 'forbidden access'});
-   }
+  if (!user || user.role !== 'admin') {
+    return res.status(403).send({ message: 'forbidden access' });
+  }
+  next();
+};
 
-      next();
-    }
 
    
    
