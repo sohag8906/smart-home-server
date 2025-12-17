@@ -140,6 +140,40 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/admin/user-count", async (req, res) => {
+  const count = await usersCollection.countDocuments({});
+  res.send({ totalUsers: count });
+});
+
+
+// --------------------
+// Admin stats route
+// --------------------
+app.get("/admin/stats", async (req, res) => {
+  try {
+    const totalUsers = await usersCollection.countDocuments();
+    const totalServices = await servicesCollection.countDocuments();
+    const totalBookings = await bookingsCollection.countDocuments();
+
+    const payments = await paymentCollection.find().toArray();
+    const totalRevenue = payments.reduce(
+      (sum, payment) => sum + Number(payment.amount || 0),
+      0
+    );
+
+    res.send({
+      totalUsers,
+      totalServices,
+      totalBookings,
+      totalRevenue,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to load admin stats" });
+  }
+});
+
+
     // --------------------
     // Payment routes
     // --------------------
@@ -172,8 +206,9 @@ async function run() {
         mode: 'payment',
         metadata: { serviceId: paymentInfo.serviceId },
         customer_email: paymentInfo.createdByEmail,
-        success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
-        cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+        success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+
       });
 
       res.send({ url: session.url });
