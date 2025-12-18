@@ -72,6 +72,7 @@ async function run() {
     const bookingsCollection = db.collection('bookings');
     const paymentCollection = db.collection('payment');
     const projectsCollection = db.collection("projects");
+    
 
     console.log("MongoDB collections ready.");
 
@@ -86,9 +87,9 @@ async function run() {
       next();
     };
 
-    // --------------------
+   
     // User routes
-    // --------------------
+ 
     app.get('/users', verifyFBToken, async (req, res) => {
       try {
         const searchText = req.query.searchText;
@@ -101,7 +102,7 @@ async function run() {
           ];
         }
 
-        const cursor = usersCollection.find(query).sort({ createAt: -1 }).limit(5);
+        const cursor = usersCollection.find(query).sort({ createAt: -1 })
         const result = await cursor.toArray();
         res.send(result);
       } catch (error) {
@@ -146,9 +147,8 @@ async function run() {
 });
 
 
-// --------------------
 // Admin stats route
-// --------------------
+
 app.get("/admin/stats", async (req, res) => {
   try {
     const totalUsers = await usersCollection.countDocuments();
@@ -174,9 +174,9 @@ app.get("/admin/stats", async (req, res) => {
 });
 
 
-    // --------------------
+    
     // Payment routes
-    // --------------------
+    
     app.post("/payment", async (req, res) => {
       try {
         const result = await paymentCollection.insertOne(req.body);
@@ -204,7 +204,9 @@ app.get("/admin/stats", async (req, res) => {
           },
         ],
         mode: 'payment',
-        metadata: { serviceId: paymentInfo.serviceId },
+        metadata: { serviceId: paymentInfo.serviceId,
+          serviceName: paymentInfo.serviceName
+         },
         customer_email: paymentInfo.createdByEmail,
         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
 cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
@@ -267,9 +269,9 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       res.send(result);
     });
 
-    // --------------------
+   
     // Services routes
-    // --------------------
+    
     app.get('/services', async (req, res) => {
       try {
         const services = await servicesCollection.find().toArray();
@@ -316,9 +318,9 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       }
     });
 
-    // --------------------
+    
     // Bookings routes
-    // --------------------
+    
     app.post("/bookings", async (req, res) => {
       try {
         const { serviceId, userEmail, userName, bookingDate, location } = req.body;
@@ -411,7 +413,7 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       }
     });
 
-    // --------------------
+   
     // Projects (assigned & status update)
     // --------------------
     app.get("/projects/assigned/:email", verifyFBToken, async (req, res) => {
