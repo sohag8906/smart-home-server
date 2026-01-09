@@ -6,9 +6,14 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const crypto = require("crypto");
 const admin = require("firebase-admin");
-const { abort } = require('process');
 
-const serviceAccount = require("./smart-home-37fee-firebase-adminsdk-fb.json");
+
+
+const decoded = Buffer.from(process.env.FB_SEVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
+
+
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -50,8 +55,8 @@ const verifyFBToken = async (req, res, next) => {
 };
 
 // MongoDB URI
-const uri = process.env.MONGO_URI || 
-  "mongodb+srv://smart_home_user:lu36KAH6Olqdbd0j@cluster0.qoielcp.mongodb.net/?appName=Cluster0";
+const uri = process.env.MONGO_URI ;
+  
 
 // MongoClient
 const client = new MongoClient(uri, {
@@ -64,7 +69,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db('smart_home_db');
 
     const usersCollection = db.collection('users');
@@ -72,7 +77,7 @@ async function run() {
     const bookingsCollection = db.collection('bookings');
     const paymentCollection = db.collection('payment');
     const projectsCollection = db.collection("projects");
-    
+
 
     console.log("MongoDB collections ready.");
 
@@ -87,9 +92,9 @@ async function run() {
       next();
     };
 
-   
+
     // User routes
- 
+
     app.get('/users', verifyFBToken, async (req, res) => {
       try {
         const searchText = req.query.searchText;
@@ -111,7 +116,7 @@ async function run() {
       }
     });
 
-    app.get('/users/:id', async (req, res) => {});
+    app.get('/users/:id', async (req, res) => { });
 
     app.get('/users/:email/role', async (req, res) => {
       const email = req.params.email;
@@ -142,41 +147,41 @@ async function run() {
     });
 
     app.get("/admin/user-count", async (req, res) => {
-  const count = await usersCollection.countDocuments({});
-  res.send({ totalUsers: count });
-});
-
-
-// Admin stats route
-
-app.get("/admin/stats", async (req, res) => {
-  try {
-    const totalUsers = await usersCollection.countDocuments();
-    const totalServices = await servicesCollection.countDocuments();
-    const totalBookings = await bookingsCollection.countDocuments();
-
-    const payments = await paymentCollection.find().toArray();
-    const totalRevenue = payments.reduce(
-      (sum, payment) => sum + Number(payment.amount || 0),
-      0
-    );
-
-    res.send({
-      totalUsers,
-      totalServices,
-      totalBookings,
-      totalRevenue,
+      const count = await usersCollection.countDocuments({});
+      res.send({ totalUsers: count });
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Failed to load admin stats" });
-  }
-});
 
 
-    
+    // Admin stats route
+
+    app.get("/admin/stats", async (req, res) => {
+      try {
+        const totalUsers = await usersCollection.countDocuments();
+        const totalServices = await servicesCollection.countDocuments();
+        const totalBookings = await bookingsCollection.countDocuments();
+
+        const payments = await paymentCollection.find().toArray();
+        const totalRevenue = payments.reduce(
+          (sum, payment) => sum + Number(payment.amount || 0),
+          0
+        );
+
+        res.send({
+          totalUsers,
+          totalServices,
+          totalBookings,
+          totalRevenue,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to load admin stats" });
+      }
+    });
+
+
+
     // Payment routes
-    
+
     app.post("/payment", async (req, res) => {
       try {
         const result = await paymentCollection.insertOne(req.body);
@@ -204,12 +209,13 @@ app.get("/admin/stats", async (req, res) => {
           },
         ],
         mode: 'payment',
-        metadata: { serviceId: paymentInfo.serviceId,
+        metadata: {
+          serviceId: paymentInfo.serviceId,
           serviceName: paymentInfo.serviceName
-         },
+        },
         customer_email: paymentInfo.createdByEmail,
         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+        cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
 
       });
 
@@ -269,9 +275,9 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       res.send(result);
     });
 
-   
+
     // Services routes
-    
+
     app.get('/services', async (req, res) => {
       try {
         const services = await servicesCollection.find().toArray();
@@ -318,9 +324,9 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       }
     });
 
-    
+
     // Bookings routes
-    
+
     app.post("/bookings", async (req, res) => {
       try {
         const { serviceId, userEmail, userName, bookingDate, location } = req.body;
@@ -413,7 +419,7 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       }
     });
 
-   
+
     // Projects (assigned & status update)
     // --------------------
     app.get("/projects/assigned/:email", verifyFBToken, async (req, res) => {
@@ -456,8 +462,8 @@ cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
     });
 
     // Test connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("MongoDB connection successful!");
+    // await client.db("admin").command({ ping: 1 });
+    //console.log("MongoDB connection successful!");
 
   } finally {
     // Keep connection alive
