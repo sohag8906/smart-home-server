@@ -3,3 +3,4 @@ node_modules
 smart-home-37fee-firebase-adminsdk-fb.json
 
 .vercel
+.env*.local

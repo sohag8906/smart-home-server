@@ -38,6 +38,9 @@ console.log(generateTrackingId());
 app.use(cors());
 app.use(express.json());
 
+
+
+
 // Firebase token verification middleware
 const verifyFBToken = async (req, res, next) => {
   const token = req.headers.authorization;
@@ -57,7 +60,7 @@ const verifyFBToken = async (req, res, next) => {
 };
 
 // MongoDB URI
-const uri = process.env.MONGO_URI || "mongodb+srv://smart_home_user:lu36KAH6Olqdbd0j@cluster0.qoielcp.mongodb.net/?appName=Cluster0";
+const uri = process.env.MONGO_URI ;
   
 
 // MongoClient
@@ -137,6 +140,31 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
+
+app.get('/users/:email', async (req, res) => {
+  const email = req.params.email;
+  const user = await usersCollection.findOne({ email });
+
+  if (!user) {
+    return res.status(404).send({ message: 'User not found' });
+  }
+
+  res.send(user);
+});
+
+
+//new
+app.get('/users/email/:email', async (req, res) => {
+  const email = req.params.email;
+  const user = await usersCollection.findOne({ email });
+
+  if (!user) {
+    return res.status(404).send({ message: 'User not found' });
+  }
+
+  res.send(user);
+});
+
 
     app.patch('/users/:id/role', verifyFBToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
