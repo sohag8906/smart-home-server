@@ -15,6 +15,8 @@ const serviceAccount = JSON.parse(decoded);
 
 
 
+
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
@@ -55,7 +57,7 @@ const verifyFBToken = async (req, res, next) => {
 };
 
 // MongoDB URI
-const uri = process.env.MONGO_URI ;
+const uri = process.env.MONGO_URI || "mongodb+srv://smart_home_user:lu36KAH6Olqdbd0j@cluster0.qoielcp.mongodb.net/?appName=Cluster0";
   
 
 // MongoClient
